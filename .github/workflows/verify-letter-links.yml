@@ -1,0 +1,31 @@
+name: Verify letter link association
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check public association files and Apple CDN
+        run: |
+          python3 - <<'PY'
+          import urllib.request,json
+          host='koheisuzuk25252525.github.io'
+          expected='93749WHY5S.com.koheisuzuk25252525.hitofude'
+          for path in ['/.well-known/apple-app-site-association','/apple-app-site-association']:
+              with urllib.request.urlopen('https://'+host+path,timeout=30) as response:
+                  assert response.url=='https://'+host+path, 'Redirects are not allowed'
+                  data=json.load(response)
+                  assert expected in data['applinks']['details'][0]['appIDs']
+                  print('Verified',path,'Content-Type:',response.headers.get('Content-Type'))
+                  if 'application/json' not in response.headers.get('Content-Type',''):
+                      print('::warning::Hosting does not serve application/json; verify Apple CDN acceptance before claiming Universal Links work.')
+          try:
+              with urllib.request.urlopen('https://app-site-association.cdn-apple.com/a/v1/'+host,timeout=30) as response:
+                  data=json.load(response)
+                  assert expected in data['applinks']['details'][0]['appIDs']
+                  print('Apple CDN has the app association')
+          except Exception as error:
+              print('::warning::Apple CDN association is not confirmed yet: '+str(error))
+          PY
